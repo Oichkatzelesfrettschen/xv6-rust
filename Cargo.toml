@@ -2,6 +2,8 @@
 name = "xv6"
 version = "0.1.0"
 authors = ["TODO"]
+edition = "2021"
+rust-version = "1.70"
 
 [lib]
 crate-type = ["staticlib"]
