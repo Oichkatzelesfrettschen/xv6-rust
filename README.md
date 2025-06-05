@@ -27,8 +27,8 @@ Prerequisites:
 1. The Rust source (`rustup component add rust-src`).
 
 Building:
-
 1. Run `make`.
+2. Or use Meson with `meson setup build && ninja -C build`.
 
 Running:
 
