@@ -55,9 +55,11 @@ void panic(char*);
 struct cmd *parsecmd(char*);
 
 // Execute cmd.  Never returns.
-void
-runcmd(struct cmd *cmd)
-{
+// This function recurses when handling pipelines or job lists. GCC's
+// -Winfinite-recursion incorrectly warns here, so disable it for this function.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winfinite-recursion"
+void runcmd(struct cmd *cmd) {
   int p[2];
   struct backcmd *bcmd;
   struct execcmd *ecmd;
@@ -123,13 +125,14 @@ runcmd(struct cmd *cmd)
     break;
 
   case BACK:
-    bcmd = (struct backcmd*)cmd;
-    if(fork1() == 0)
+    bcmd = (struct backcmd *)cmd;
+    if (fork1() == 0)
       runcmd(bcmd->cmd);
     break;
   }
   exit();
 }
+#pragma GCC diagnostic pop
 
 int
 getcmd(char *buf, int nbuf)

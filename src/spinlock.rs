@@ -1,8 +1,9 @@
-use proc::Cpu;
+use crate::proc::Cpu;
 
 use core::ffi;
 
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct Spinlock {
     locked: u32,
     name: *const u8,

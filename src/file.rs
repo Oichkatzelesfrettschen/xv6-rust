@@ -1,7 +1,8 @@
-use fs::NDIRECT;
-use pipe::Pipe;
+use crate::fs::NDIRECT;
+use crate::pipe::Pipe;
 
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct File {
     itype: i32, // should be enum
     refc: i32,
@@ -13,6 +14,7 @@ pub struct File {
 }
 
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct Inode {
     dev: u32,
     inum: u32,
@@ -23,5 +25,5 @@ pub struct Inode {
     major: i16,
     nlink: i16,
     size: u32,
-    addrs: [u32; NDIRECT+1],
+    addrs: [u32; NDIRECT + 1],
 }

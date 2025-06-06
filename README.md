@@ -33,6 +33,22 @@ Building:
 Running:
 
 1. Run `make run`.
+2. Or run `./run-curses.sh` to start QEMU with a curses display.
+3. Containers that can't display curses directly can use `./run-tmux.sh`.
+
+### Running in tmux
+
+The `run-tmux.sh` helper creates a detached tmux session and launches
+QEMU using a curses display. This is useful when the host terminal
+cannot display curses directly or when you want to capture the boot
+output. Example usage:
+
+```bash
+./run-tmux.sh testsession
+tmux attach -t testsession
+```
+
+Use `tmux capture-pane -pt testsession` to log the boot process.
 
 Debugging:
 

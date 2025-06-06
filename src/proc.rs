@@ -1,7 +1,7 @@
-use file::{File, Inode};
-use types::Pde;
-use param;
-use mmu;
+use crate::file::{File, Inode};
+use crate::mmu;
+use crate::param;
+use crate::types::Pde;
 
 use core::ffi;
 
