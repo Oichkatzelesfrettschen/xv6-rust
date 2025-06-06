@@ -1,6 +1,8 @@
-use syscall::argint;
-use proc::{growproc, exit, kill, fork, sleep, wait, myproc};
-use trap::ticks;
+//! Rust implementations of simple system call handlers.
+
+use crate::proc::{exit, fork, growproc, kill, myproc, sleep, wait};
+use crate::syscall::argint;
+use crate::trap::ticks;
 use x86::io::outw;
 
 use core::ffi::c_void;
@@ -19,7 +21,7 @@ pub unsafe extern "C" fn sys_exit() -> i32 {
 #[no_mangle]
 pub unsafe extern "C" fn sys_kill() -> i32 {
     let mut pid: i32 = 0;
-    
+
     if argint(0, &mut pid as *mut i32) < 0 {
         -1
     } else {

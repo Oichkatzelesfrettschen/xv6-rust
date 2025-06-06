@@ -1,6 +1,7 @@
-use spinlock;
-use uart::uartputc;
+use crate::spinlock;
+use crate::uart::uartputc;
 
+use lazy_static::lazy_static;
 use spin::Mutex;
 
 use core::fmt;
@@ -10,13 +11,16 @@ extern "C" {
     pub fn consoleintr(f: unsafe extern "C" fn() -> i32);
 }
 
+/// Constant representing the backspace key in raw mode.
 const BACKSPACE: i32 = 0x100;
 const BACKSCHAR: u8 = b'\x08';
 
+/// Minimal console writer used by `print!` macros.
 pub struct Writer;
 
 impl Writer {
-    pub fn new() -> Self {
+    /// Create a new console writer.
+    pub const fn new() -> Self {
         Writer {}
     }
 

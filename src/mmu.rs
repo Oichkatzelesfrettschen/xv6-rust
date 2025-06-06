@@ -1,6 +1,8 @@
+use bitfield::bitfield;
 use core::ffi;
 
 #[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct TaskState {
     link: u32,
     esp0: u32,
@@ -41,7 +43,7 @@ pub struct TaskState {
     iomb: u16,
 }
 
-bitfield!{
+bitfield! {
     #[repr(C)]
     pub struct SegDesc(MSB0 [u8]);
     u32;

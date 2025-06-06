@@ -119,7 +119,7 @@ AS = $(TOOLPREFIX)gas
 LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
-CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer
+CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -Wno-array-bounds -fno-omit-frame-pointer
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 CFLAGS += $(CS333_CFLAGS)
 ASFLAGS = -m32 -gdwarf-2 -Wa,-divide
@@ -177,7 +177,11 @@ kernel: rkernel $(OBJS) entry.o entryother initcode kernel.ld
 	$(OBJDUMP) -t kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > kernel.sym
 
 rkernel:
-	$(CARGO) xbuild --target i386.json
+	# Build using cargo's unstable build-std feature to compile
+	# the core Rust libraries for our i386 target.
+	$(CARGO) build -Z build-std=core,alloc,compiler_builtins \
+	-Z build-std-features=compiler-builtins-mem \
+	--target i386.json
 
 # kernelmemfs is a copy of kernel that maintains the
 # disk image in memory instead of writing to a disk.
