@@ -18,6 +18,7 @@
 // * B_DIRTY: the buffer data has been modified
 //     and needs to be written to disk.
 
+// clang-format off
 #include "types.h"
 #include "defs.h"
 #include "param.h"
@@ -25,6 +26,7 @@
 #include "sleeplock.h"
 #include "fs.h"
 #include "buf.h"
+// clang-format on
 
 struct {
   struct spinlock lock;
@@ -35,18 +37,23 @@ struct {
   struct buf head;
 } bcache;
 
-void
-binit(void)
-{
+/**
+ * Initialize the buffer cache at boot.
+ *
+ * Sets up a doubly linked list of `struct buf` objects and initializes
+ * locks for each buffer. This function must run once during system
+ * startup before any buffers are used.
+ */
+void binit(void) {
   struct buf *b;
 
   initlock(&bcache.lock, "bcache");
 
-//PAGEBREAK!
-  // Create linked list of buffers
+  // PAGEBREAK!
+  //  Create linked list of buffers
   bcache.head.prev = &bcache.head;
   bcache.head.next = &bcache.head;
-  for(b = bcache.buf; b < bcache.buf+NBUF; b++){
+  for (b = bcache.buf; b < bcache.buf + NBUF; b++) {
     b->next = bcache.head.next;
     b->prev = &bcache.head;
     initsleeplock(&b->lock, "buffer");
@@ -58,16 +65,25 @@ binit(void)
 // Look through buffer cache for block on device dev.
 // If not found, allocate a buffer.
 // In either case, return locked buffer.
-static struct buf*
-bget(uint dev, uint blockno)
-{
+/**
+ * Fetch a buffer for a specific disk block.
+ *
+ * If the block is already cached it returns the existing buffer and
+ * increments its reference count. Otherwise an unused buffer is
+ * recycled. The returned buffer is locked on exit.
+ *
+ * @param dev Device number of the block.
+ * @param blockno Block number on the device.
+ * @return Locked buffer containing the block data.
+ */
+static struct buf *bget(uint dev, uint blockno) {
   struct buf *b;
 
   acquire(&bcache.lock);
 
   // Is the block already cached?
-  for(b = bcache.head.next; b != &bcache.head; b = b->next){
-    if(b->dev == dev && b->blockno == blockno){
+  for (b = bcache.head.next; b != &bcache.head; b = b->next) {
+    if (b->dev == dev && b->blockno == blockno) {
       b->refcnt++;
       release(&bcache.lock);
       acquiresleep(&b->lock);
@@ -78,8 +94,8 @@ bget(uint dev, uint blockno)
   // Not cached; recycle an unused buffer.
   // Even if refcnt==0, B_DIRTY indicates a buffer is in use
   // because log.c has modified it but not yet committed it.
-  for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
-    if(b->refcnt == 0 && (b->flags & B_DIRTY) == 0) {
+  for (b = bcache.head.prev; b != &bcache.head; b = b->prev) {
+    if (b->refcnt == 0 && (b->flags & B_DIRTY) == 0) {
       b->dev = dev;
       b->blockno = blockno;
       b->flags = 0;
@@ -93,23 +109,38 @@ bget(uint dev, uint blockno)
 }
 
 // Return a locked buf with the contents of the indicated block.
-struct buf*
-bread(uint dev, uint blockno)
-{
+/**
+ * Read a disk block into a locked buffer.
+ *
+ * Ensures the buffer has valid data from disk before returning. The
+ * caller is responsible for releasing the buffer with `brelse` when
+ * done.
+ *
+ * @param dev Device number of the block.
+ * @param blockno Block number to read.
+ * @return Locked buffer containing the block data.
+ */
+struct buf *bread(uint dev, uint blockno) {
   struct buf *b;
 
   b = bget(dev, blockno);
-  if((b->flags & B_VALID) == 0) {
+  if ((b->flags & B_VALID) == 0) {
     iderw(b);
   }
   return b;
 }
 
 // Write b's contents to disk.  Must be locked.
-void
-bwrite(struct buf *b)
-{
-  if(!holdingsleep(&b->lock))
+/**
+ * Write a locked buffer's contents to disk.
+ *
+ * The caller must hold the buffer's sleep lock. Marks the buffer dirty
+ * and issues the disk write.
+ *
+ * @param b Buffer to write; must be locked by the caller.
+ */
+void bwrite(struct buf *b) {
+  if (!holdingsleep(&b->lock))
     panic("bwrite");
   b->flags |= B_DIRTY;
   iderw(b);
@@ -117,10 +148,16 @@ bwrite(struct buf *b)
 
 // Release a locked buffer.
 // Move to the head of the MRU list.
-void
-brelse(struct buf *b)
-{
-  if(!holdingsleep(&b->lock))
+/**
+ * Release a locked buffer.
+ *
+ * Decrements the reference count and moves the buffer to the head of
+ * the MRU list if no other process is waiting for it.
+ *
+ * @param b Buffer to release; must be locked by the caller.
+ */
+void brelse(struct buf *b) {
+  if (!holdingsleep(&b->lock))
     panic("brelse");
 
   releasesleep(&b->lock);
@@ -136,9 +173,8 @@ brelse(struct buf *b)
     bcache.head.next->prev = b;
     bcache.head.next = b;
   }
-  
+
   release(&bcache.lock);
 }
-//PAGEBREAK!
-// Blank page.
-
+// PAGEBREAK!
+//  Blank page.

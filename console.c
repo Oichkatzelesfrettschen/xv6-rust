@@ -1,18 +1,20 @@
 // Console input and output.
 // Input is from the keyboard or serial port.
 // Output is written to the screen and serial port.
+// clang-format off
+#include "types.h"
 #include "defs.h"
-#include "file.h"
-#include "fs.h"
+#include "param.h"
 #include "memlayout.h"
 #include "mmu.h"
-#include "param.h"
 #include "proc.h"
-#include "sleeplock.h"
 #include "spinlock.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "file.h"
 #include "traps.h"
-#include "types.h"
 #include "x86.h"
+// clang-format on
 
 static void consputc(int);
 
