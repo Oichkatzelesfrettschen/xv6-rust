@@ -55,3 +55,7 @@ Debugging:
 1. Run `make debug`; QEMU will expose a debugging port for GDB to attach to.
 
 1. In another terminal session, run `rust-gdb`.
+
+## Contribution Guidelines
+
+All code changes must pursue mathematical decomposition, unrolling loops where it clarifies the intent, and refactor code into modern paradigms. Every function must include thorough Doxygen comments, and documentation should integrate with Sphinx and Breathe to support Read-the-Docs builds.
