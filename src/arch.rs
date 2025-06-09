@@ -1,4 +1,6 @@
 #[repr(C)]
+/// Saved registers for trap handling.
+#[derive(Default, Debug, Copy, Clone)]
 pub struct Trapframe {
     edi: u32,
     esi: u32,

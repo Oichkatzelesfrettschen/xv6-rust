@@ -7,13 +7,14 @@ use crate::lapic::microdelay;
 use crate::traps::IRQ_COM1;
 use x86::io::{inb, outb};
 
-/// UART driver used for early boot and debugging output.
+/** UART driver used for early boot and debugging output. */
 
 const COM1: u16 = 0x3f8;
 
 static mut UART_PRESENT: bool = false;
 
 #[no_mangle]
+#[inline]
 pub unsafe extern "C" fn uartinit() {
     // Turn off the FIFO
     outb(COM1 + 2, 0);
@@ -46,6 +47,7 @@ pub unsafe extern "C" fn uartinit() {
 }
 
 #[no_mangle]
+#[inline]
 pub unsafe extern "C" fn uartputc(c: i32) {
     if !UART_PRESENT {
         return;
@@ -63,6 +65,7 @@ pub unsafe extern "C" fn uartputc(c: i32) {
 }
 
 #[no_mangle]
+#[inline]
 pub unsafe extern "C" fn uartgetc() -> i32 {
     if !UART_PRESENT {
         return -1;
@@ -76,6 +79,7 @@ pub unsafe extern "C" fn uartgetc() -> i32 {
 }
 
 #[no_mangle]
+#[inline]
 pub unsafe extern "C" fn uartintr() {
     consoleintr(uartgetc);
 }
