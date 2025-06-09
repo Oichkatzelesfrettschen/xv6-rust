@@ -26,6 +26,13 @@ Prerequisites:
 
 1. The Rust source (`rustup component add rust-src`).
 
+## Running setup.sh
+
+Run `./setup.sh` before building to install all dependencies automatically. The
+script installs QEMU, Sphinx, Doxygen, CLOC, and the Rust toolchains alongside
+other utilities, ensuring the environment is ready for compilation and
+documentation generation.
+
 Building:
 1. Run `make`.
 2. Or use Meson with `meson setup build && ninja -C build`.
