@@ -1,5 +1,4 @@
-//! Rust implementations of simple system call handlers.
-
+/** Rust implementations of simple system call handlers. */
 use crate::proc::{exit, fork, growproc, kill, myproc, sleep, wait};
 use crate::syscall::argint;
 use crate::trap::ticks;

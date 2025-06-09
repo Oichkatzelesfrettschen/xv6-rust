@@ -1,4 +1,5 @@
 use crate::console::consoleintr;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use x86::io::inb;
 
 /// Basic PC keyboard driver mapping scan codes to characters.
@@ -40,6 +41,9 @@ const KEY_PGDN: u8 = 0xE7;
 const KEY_INS: u8 = 0xE8;
 const KEY_DEL: u8 = 0xE9;
 
+static SHIFT_VAR: AtomicUsize = AtomicUsize::new(0);
+static CHARCODE: [&'static [u8]; 4] = [&NORMALMAP, &SHIFTMAP, &CTLMAP, &CTLMAP];
+
 // translate a control character into the equivalent ASCII code
 macro_rules! C {
     ($c:expr) => {
@@ -47,6 +51,7 @@ macro_rules! C {
     };
 }
 
+#[rustfmt::skip]
 static NORMALMAP: [u8; 256] = [
     NO, 0x1B, b'1', b'2', b'3', b'4', b'5', b'6', // 0x00
     b'7', b'8', b'9', b'0', b'-', b'=', 0x08, b'\t', b'q', b'w', b'e', b'r', b't', b'y', b'u',
@@ -72,6 +77,7 @@ static NORMALMAP: [u8; 256] = [
     NO, NO, NO, NO, NO, NO, NO, NO,
 ];
 
+#[rustfmt::skip]
 static SHIFTMAP: [u8; 256] = [
     NO, 033, b'!', b'@', b'#', b'$', b'%', b'^', // 0x00
     b'&', b'*', b'(', b')', b'_', b'+', 0x08, b'\t', b'Q', b'W', b'E', b'R', b'T', b'Y', b'U',
@@ -97,6 +103,7 @@ static SHIFTMAP: [u8; 256] = [
     NO, NO, NO, NO, NO, NO, NO, NO,
 ];
 
+#[rustfmt::skip]
 static CTLMAP: [u8; 256] = [
     NO,
     NO,
@@ -356,6 +363,7 @@ static CTLMAP: [u8; 256] = [
     NO,
 ];
 
+#[rustfmt::skip]
 static SHIFTCODE: [u8; 256] = [
     NO, NO, NO, NO, NO, NO, NO, NO, // 0x00
     NO, NO, NO, NO, NO, CTL, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, // 0x10
@@ -376,6 +384,7 @@ static SHIFTCODE: [u8; 256] = [
     NO, NO, NO, NO, NO, NO, NO, NO,
 ];
 
+#[rustfmt::skip]
 static TOGGLECODE: [u8; 256] = [
     NO, NO, NO, NO, NO, NO, NO, NO, // 0x00
     NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, NO, // 0x10
@@ -397,43 +406,50 @@ static TOGGLECODE: [u8; 256] = [
 ];
 
 #[no_mangle]
+/// Keyboard interrupt handler invoked from ASM stub.
+#[inline]
 pub extern "C" fn kbdintr() {
     unsafe {
         consoleintr(kbdgetc);
     }
 }
 
+/// Read a key from the keyboard controller.
+#[inline]
 pub extern "C" fn kbdgetc() -> i32 {
-    static mut SHIFT_VAR: usize = 0;
-    static CHARCODE: [&'static [u8]; 4] = [&NORMALMAP, &SHIFTMAP, &CTLMAP, &CTLMAP];
+    use core::sync::atomic::Ordering;
     let st = unsafe { inb(KBSTATP as u16) };
     if st & KBS_DIB == 0 {
         return -1;
     }
     let mut data = unsafe { inb(KBDATAP as u16) };
     if data == 0xE0 {
-        unsafe { SHIFT_VAR |= E0ESC };
+        SHIFT_VAR.fetch_or(E0ESC, Ordering::SeqCst);
         return 0;
     } else if data & 0x80 != 0 {
         // Key released
-        data = if unsafe { SHIFT_VAR } & E0ESC != 0 {
+        data = if SHIFT_VAR.load(Ordering::SeqCst) & E0ESC != 0 {
             data
         } else {
             data & 0x7F
         };
-        unsafe { SHIFT_VAR &= !(SHIFTCODE[data as usize] as usize | E0ESC) };
+        SHIFT_VAR.fetch_and(
+            !(SHIFTCODE[data as usize] as usize | E0ESC),
+            Ordering::SeqCst,
+        );
         return 0;
-    } else if unsafe { SHIFT_VAR } & E0ESC != 0 {
+    } else if SHIFT_VAR.load(Ordering::SeqCst) & E0ESC != 0 {
         // Last character was an E0 escape; or with 0x80
         data |= 0x80;
-        unsafe { SHIFT_VAR &= !E0ESC };
+        SHIFT_VAR.fetch_and(!E0ESC, Ordering::SeqCst);
     }
-    unsafe {
-        SHIFT_VAR |= SHIFTCODE[data as usize] as usize;
-        SHIFT_VAR ^= TOGGLECODE[data as usize] as usize;
-    }
-    let mut c = CHARCODE[unsafe { SHIFT_VAR } & (CTL | SHIFT) as usize][data as usize];
-    if unsafe { SHIFT_VAR } & CAPSLOCK as usize != 0 {
+    let mut state = SHIFT_VAR.load(Ordering::SeqCst);
+    state |= SHIFTCODE[data as usize] as usize;
+    state ^= TOGGLECODE[data as usize] as usize;
+    SHIFT_VAR.store(state, Ordering::SeqCst);
+
+    let mut c = CHARCODE[state & (CTL | SHIFT) as usize][data as usize];
+    if state & CAPSLOCK as usize != 0 {
         if b'a' <= c && c <= b'z' {
             c += 224 // 'A' - 'a'
         } else if b'A' <= c && c <= b'Z' {
