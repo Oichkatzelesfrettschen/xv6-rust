@@ -37,7 +37,9 @@ $SUDO apt-get install -y \
 $SUDO apt-get install -y \
     qemu \
     qemu-system-x86 \
-    qemu-utils
+    qemu-utils \
+    qemu-user-static \
+    tmux
 
 # 4. Install documentation generators & graphviz
 $SUDO apt-get install -y \
