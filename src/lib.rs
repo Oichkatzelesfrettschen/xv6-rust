@@ -1,5 +1,6 @@
 #![no_std]
-//! Core kernel crate exposing C ABI entrypoints.
+//! \file lib.rs
+//! \brief Core kernel crate exposing C ABI entrypoints.
 
 // Module uses rely on explicit macro imports in each file
 
@@ -27,10 +28,16 @@ pub mod uart;
 use core::panic::PanicInfo;
 
 #[no_mangle]
+/// \brief Kernel entry point once memory and CPUs are initialized.
+///
+/// This function is invoked from the C portion of the boot process and
+/// prints a greeting to confirm Rust has been reached.
+#[no_mangle]
 pub unsafe extern "C" fn kmain() {
     println!("Hello from {}", "Rust");
 }
 
+/// \brief Minimal panic handler used during early bring-up.
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
