@@ -10,16 +10,10 @@ Welcome to xv6-rust's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-
-
+   doxygen/index
 Indices and tables
 ==================
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
-.. toctree::
-   :maxdepth: 1
-
-   API Reference <doxygen/index>
