@@ -37,7 +37,9 @@ $SUDO apt-get install -y \
 $SUDO apt-get install -y \
     qemu \
     qemu-system-x86 \
-    qemu-utils
+    qemu-utils \
+    qemu-user-static \
+    tmux
 
 # 4. Install documentation generators & graphviz
 $SUDO apt-get install -y \
@@ -45,7 +47,8 @@ $SUDO apt-get install -y \
     graphviz \
     python3-sphinx \
     python3-sphinx-rtd-theme \
-    python3-sphinxcontrib.jquery
+    python3-sphinxcontrib.jquery \
+    python3-breathe
 
 # 5. Install Rust toolchain via rustup if missing
 if ! command -v rustup &> /dev/null; then
