@@ -5,7 +5,8 @@ rust:
   - nightly
 
 before_install:
-  - sudo apt update && sudo apt install gcc qemu -y
+  - sudo apt update && sudo apt install gcc-multilib g++-multilib qemu-system-x86 doxygen python3-sphinx python3-pip -y
+  - pip3 install sphinx-rtd-theme
   - cargo install cargo-xbuild
   - rustup component add rust-src
 
@@ -14,3 +15,4 @@ install:
 
 script:
   - ./test.sh
+  - ./docs/build_docs.sh

@@ -5,6 +5,11 @@
 
 set -e
 
+# If not already inside tmux, spawn a session so QEMU can be reattached.
+if [ -z "$TMUX" ]; then
+    exec "$(dirname "$0")/run-tmux.sh" "${1:-xv6}"
+fi
+
 # Build the image when absent.
 [ -f xv6.img ] || make
 

@@ -6,7 +6,7 @@
   "target-c-int-width": "32",
   "arch": "x86",
   "os": "none",
-  "features": "-mmx,-sse",
+  "features": "+sse2",
   "disable-redzone": true,
   "linker-flavor": "ld.lld",
   "linker": "ld",

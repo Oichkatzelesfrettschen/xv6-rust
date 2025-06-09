@@ -129,7 +129,7 @@ LDFLAGS += -m $(shell $(LD) -V | grep elf_i386 2>/dev/null | head -n 1)
 # Set Rust target path
 RUST_TARGET_PATH := ${CURDIR}
 
-CARGO := @cargo
+CARGO := @cargo +nightly
 
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
