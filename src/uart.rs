@@ -1,4 +1,8 @@
-// Intel 8250 serial port (UART)
+//! \file uart.rs
+//! \brief Minimal driver for the Intel 8250 serial port (UART).
+//!
+//! This module provides early boot console output and input handling
+//! used throughout the kernel.
 // https://wiki.osdev.org/UART
 
 use crate::console::consoleintr;
@@ -46,6 +50,9 @@ pub unsafe extern "C" fn uartinit() {
 }
 
 #[no_mangle]
+/// \brief Output a single character via the UART.
+///
+/// Blocks until the transmit FIFO has space and then writes the byte.
 pub unsafe extern "C" fn uartputc(c: i32) {
     if !UART_PRESENT {
         return;
@@ -63,6 +70,7 @@ pub unsafe extern "C" fn uartputc(c: i32) {
 }
 
 #[no_mangle]
+/// \brief Read a character from the UART if available.
 pub unsafe extern "C" fn uartgetc() -> i32 {
     if !UART_PRESENT {
         return -1;
@@ -76,6 +84,7 @@ pub unsafe extern "C" fn uartgetc() -> i32 {
 }
 
 #[no_mangle]
+/// \brief UART interrupt handler that feeds received bytes to the console layer.
 pub unsafe extern "C" fn uartintr() {
     consoleintr(uartgetc);
 }

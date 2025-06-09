@@ -1,4 +1,8 @@
+//! \file arch.rs
+//! \brief Architecture-specific structures and constants.
+
 #[repr(C)]
+/// \brief CPU state saved during a trap.
 pub struct Trapframe {
     edi: u32,
     esi: u32,
