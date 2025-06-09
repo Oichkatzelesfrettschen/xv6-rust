@@ -45,7 +45,10 @@ $SUDO apt-get install -y \
     graphviz \
     python3-sphinx \
     python3-sphinx-rtd-theme \
-    python3-sphinxcontrib.jquery
+    python3-sphinxcontrib.jquery \
+    python3-breathe \
+    tmux \
+    qemu-nox
 
 # 5. Install Rust toolchain via rustup if missing
 if ! command -v rustup &> /dev/null; then
