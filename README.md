@@ -28,10 +28,7 @@ Prerequisites:
 
 ## Running setup.sh
 
-Run `./setup.sh` before building to install all dependencies automatically. The
-script installs QEMU, Sphinx, Doxygen, CLOC, and the Rust toolchains alongside
-other utilities, ensuring the environment is ready for compilation and
-documentation generation.
+Run `./setup.sh` before building to install all dependencies automatically. The script installs QEMU, Sphinx, Doxygen, CLOC, and the Rust toolchains (including rustfmt) along with other utilities, preparing the environment for compilation and documentation generation.
 
 Building:
 1. Run `make`.
