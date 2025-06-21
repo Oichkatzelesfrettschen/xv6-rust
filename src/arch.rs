@@ -1,11 +1,12 @@
 //! \file arch.rs
 //! \brief Architecture-specific structures and constants.
 
+use bytemuck::{Pod, Zeroable};
+
 #[repr(C)]
 /// \brief CPU state saved during a trap.
 /// Saved registers for trap handling.
-#[derive(Default, Debug, Copy, Clone)]
-
+#[derive(Default, Debug, Copy, Clone, Pod, Zeroable)]
 pub struct Trapframe {
     edi: u32,
     esi: u32,

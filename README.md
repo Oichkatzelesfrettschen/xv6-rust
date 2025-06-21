@@ -12,27 +12,22 @@ One of the motivating academic factors behind this project (which has played a h
 
 Prerequisites:
 
-1. A linux environment.
-
-1. The QEMU simulator.
-
-1. The `gcc` compiler suite.
-
-1. The Rust compiler.
-
-1. `cargo-xbuild` (`cargo install cargo-xbuild`).
-
-1. A nightly override for the cloned repository (`rustup override set nightly`).
-
-1. The Rust source (`rustup component add rust-src`).
+1. A Linux environment.
+2. The QEMU simulator.
+3. The `gcc` compiler suite.
+4. A nightly Rust toolchain (e.g., run `rustup default nightly` or `rustup override set nightly` in the project directory).
+5. The Rust source component (`rustup component add rust-src`).
+6. `cargo-xbuild` (`cargo install cargo-xbuild`) - **Note: Only required if building with Meson. The `make` build process uses `-Z build-std` flags directly.**
 
 ## Running setup.sh
 
 Run `./setup.sh` before building to install all dependencies automatically. The script installs QEMU, Sphinx, Doxygen, CLOC, and the Rust toolchains (including rustfmt) along with other utilities, preparing the environment for compilation and documentation generation.
 
 Building:
-1. Run `make`.
-2. Or use Meson with `meson setup build && ninja -C build`.
+1. Run `make`. This uses `cargo build` with specific flags (`-Z build-std=...`) to compile the Rust code for the custom target, requiring a nightly toolchain and the `rust-src` component.
+2. Or use Meson with `meson setup build && ninja -C build`. This method uses `cargo xbuild`.
+
+(For developers using direct `cargo` commands, e.g., in IDEs, the project includes a `.cargo/config.toml` file that configures the build for the custom target automatically when using a nightly toolchain.)
 
 Running:
 
