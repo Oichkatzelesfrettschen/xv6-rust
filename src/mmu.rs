@@ -1,8 +1,10 @@
 use bitfield::bitfield;
 use core::ffi;
+use bytemuck::Zeroable;
+use zerocopy::{FromBytes, IntoBytes as AsBytes, Unaligned};
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, Zeroable)]
 /// Task state segment for hardware task switching.
 pub struct TaskState {
     /// Old link field.
@@ -83,6 +85,7 @@ pub struct TaskState {
 
 bitfield! {
     #[repr(C)]
+    #[derive(Copy, Clone, Default, Zeroable, FromBytes, AsBytes, Unaligned)] // Removed Pod
     /// x86 segment descriptor.
     pub struct SegDesc(MSB0 [u8]);
     u32;

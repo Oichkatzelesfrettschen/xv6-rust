@@ -30,7 +30,6 @@ static mut UART_PRESENT: bool = false;
 ///  
 /// \note Must be called early in boot, before interrupts are enabled.
 #[no_mangle]
-#[inline]
 pub unsafe extern "C" fn uartinit() {
     // Turn off the FIFO
     outb(COM1 + 2, 0x00);
@@ -67,7 +66,6 @@ pub unsafe extern "C" fn uartinit() {
 ///  
 /// \param c Character code (0–255).
 #[no_mangle]
-#[inline]
 pub unsafe extern "C" fn uartputc(c: i32) {
     if !UART_PRESENT {
         return;
@@ -88,7 +86,6 @@ pub unsafe extern "C" fn uartputc(c: i32) {
 ///  
 /// \returns Received byte or –1.
 #[no_mangle]
-#[inline]
 pub unsafe extern "C" fn uartgetc() -> i32 {
     if !UART_PRESENT {
         return -1;
@@ -104,7 +101,6 @@ pub unsafe extern "C" fn uartgetc() -> i32 {
 ///  
 /// Invoked on COM1 IRQ; reads all available bytes and passes them to `consoleintr`.
 #[no_mangle]
-#[inline]
 pub unsafe extern "C" fn uartintr() {
     consoleintr(uartgetc);
 }

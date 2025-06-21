@@ -1,5 +1,5 @@
 use crate::console::consoleintr;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::AtomicUsize;
 use x86::io::inb;
 
 /// Basic PC keyboard driver mapping scan codes to characters.
@@ -407,7 +407,6 @@ static TOGGLECODE: [u8; 256] = [
 
 #[no_mangle]
 /// Keyboard interrupt handler invoked from ASM stub.
-#[inline]
 pub extern "C" fn kbdintr() {
     unsafe {
         consoleintr(kbdgetc);
@@ -415,7 +414,6 @@ pub extern "C" fn kbdintr() {
 }
 
 /// Read a key from the keyboard controller.
-#[inline]
 pub extern "C" fn kbdgetc() -> i32 {
     use core::sync::atomic::Ordering;
     let st = unsafe { inb(KBSTATP as u16) };

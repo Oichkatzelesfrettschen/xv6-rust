@@ -3,10 +3,12 @@
 
 use crate::fs::NDIRECT;
 use crate::pipe::Pipe;
+use bytemuck::Zeroable;
+use zerocopy::{FromBytes, IntoBytes as AsBytes};
 
 /// \brief Open file description (in-memory).
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, Zeroable)]
 pub struct File {
     /// \brief File type (see file.c).
     pub itype:    i32,
@@ -26,7 +28,8 @@ pub struct File {
 
 /// \brief On-disk inode structure.
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Default)]
+#[repr(packed)]
+#[derive(Debug, Copy, Clone, Default, FromBytes, AsBytes)]
 pub struct Inode {
     /// \brief Device number containing the inode.
     pub dev:    u32,
