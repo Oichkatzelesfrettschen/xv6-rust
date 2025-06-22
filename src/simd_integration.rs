@@ -2,9 +2,10 @@
 
 use super::fpu_state::{FpuManager, FpuState};
 use super::simd_mem::{memcpy_fast, memset_fast};
-use super::simd_string::{strlen_fast_slice, strcmp_fast_slice, memchr_fast_slice};
-use core::ffi::{c_char, c_int, c_void, c_size_t as size_t};
+use super::simd_string::{memchr_fast_slice, strcmp_fast_slice, strlen_fast_slice};
+use core::ffi::{c_char, c_int, c_size_t as size_t, c_void};
 use core::mem::MaybeUninit;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(feature = "simd_debug_print")]
 extern "C" {
@@ -25,28 +26,50 @@ macro_rules! debug_cprintf {
 
 #[thread_local]
 static mut KERNEL_FPU_STATE: MaybeUninit<FpuManager> = MaybeUninit::uninit();
+/// Indicates whether `KERNEL_FPU_STATE` has been initialized.
+static SIMD_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
+/// \brief Enter a critical section that allows use of SIMD/FPU instructions.
+///
+/// This function safely restores the kernel's FPU state if the subsystem has
+/// been initialized via [`init_simd_subsystem`]. It becomes a no-op otherwise.
 #[no_mangle]
 pub unsafe extern "C" fn kernel_fpu_begin() {
     debug_cprintf!("kernel_fpu_begin\n");
-    KERNEL_FPU_STATE.assume_init_mut().begin_use();
+    if SIMD_INITIALIZED.load(Ordering::Relaxed) {
+        KERNEL_FPU_STATE.assume_init_mut().begin_use();
+    }
 }
 
+/// \brief Exit the SIMD/FPU critical section.
+///
+/// If the FPU subsystem has not been initialized, this function simply
+/// returns. Otherwise it saves the current FPU state for later use.
 #[no_mangle]
 pub unsafe extern "C" fn kernel_fpu_end() {
     debug_cprintf!("kernel_fpu_end\n");
-    KERNEL_FPU_STATE.assume_init_mut().end_use();
+    if SIMD_INITIALIZED.load(Ordering::Relaxed) {
+        KERNEL_FPU_STATE.assume_init_mut().end_use();
+    }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rust_memcpy(dst: *mut c_void, src: *const c_void, n: size_t) -> *mut c_void {
+pub unsafe extern "C" fn rust_memcpy(
+    dst: *mut c_void,
+    src: *const c_void,
+    n: size_t,
+) -> *mut c_void {
     debug_cprintf!("rust_memcpy called\n");
     memcpy_fast(dst as *mut u8, src as *const u8, n);
     dst
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rust_memmove(dst: *mut c_void, src: *const c_void, n: size_t) -> *mut c_void {
+pub unsafe extern "C" fn rust_memmove(
+    dst: *mut c_void,
+    src: *const c_void,
+    n: size_t,
+) -> *mut c_void {
     debug_cprintf!("rust_memmove called\n");
     core::ptr::copy(src as *const u8, dst as *mut u8, n);
     dst
@@ -94,9 +117,15 @@ pub unsafe extern "C" fn rust_strncmp(s1: *const c_char, s2: *const c_char, n: s
     while i < n {
         let b1 = *(s1 as *const u8).add(i);
         let b2 = *(s2 as *const u8).add(i);
-        if b1 < b2 { return -1; }
-        if b1 > b2 { return 1; }
-        if b1 == 0 { return 0; }
+        if b1 < b2 {
+            return -1;
+        }
+        if b1 > b2 {
+            return 1;
+        }
+        if b1 == 0 {
+            return 0;
+        }
         i += 1;
     }
     0
@@ -130,8 +159,12 @@ pub unsafe fn memcmp_fast(s1: *const u8, s2: *const u8, len: usize) -> i32 {
     while i < len {
         let b1 = *s1.add(i);
         let b2 = *s2.add(i);
-        if b1 < b2 { return -1; }
-        if b1 > b2 { return 1; }
+        if b1 < b2 {
+            return -1;
+        }
+        if b1 > b2 {
+            return 1;
+        }
         i += 1;
     }
     0
@@ -139,7 +172,11 @@ pub unsafe fn memcmp_fast(s1: *const u8, s2: *const u8, len: usize) -> i32 {
 
 #[no_mangle]
 pub unsafe extern "C" fn rust_pages_equal(p1: *const u8, p2: *const u8) -> c_int {
-    if memcmp_fast(p1, p2, 4096) == 0 { 1 } else { 0 }
+    if memcmp_fast(p1, p2, 4096) == 0 {
+        1
+    } else {
+        0
+    }
 }
 
 #[no_mangle]
@@ -160,9 +197,15 @@ pub unsafe extern "C" fn rust_ip_checksum(addr: *const u8, mut count: c_int) -> 
     !sum as u16
 }
 
+/// \brief Initialize SIMD and FPU support for the kernel.
+///
+/// This must be invoked before any calls to [`kernel_fpu_begin`] or
+/// [`kernel_fpu_end`]. It configures the processor's FPU and marks the
+/// thread-local state as ready for use.
 #[no_mangle]
 pub unsafe extern "C" fn init_simd_subsystem() {
     debug_cprintf!("init_simd_subsystem called\n");
     crate::fpu_state::init_fpu();
     KERNEL_FPU_STATE.write(FpuManager::new());
+    SIMD_INITIALIZED.store(true, Ordering::Relaxed);
 }

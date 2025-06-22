@@ -1,13 +1,12 @@
 #![allow(dead_code)]
 
-use crate::cpu_features::{has_sse2, has_sse4_2}; // Note: has_sse4_2 needs to be added
+use crate::cpu_features::{has_sse2, has_sse4_2};
 use core::arch::asm;
 // Ensure core::arch::x86 is available for intrinsics
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
-
 
 // --- strlen ---
 #[inline(always)]
@@ -49,7 +48,9 @@ unsafe fn strlen_sse2(s: &[u8]) -> usize {
 
 #[inline(always)]
 pub fn strlen_fast_slice(s: &[u8]) -> usize {
-    if s.is_empty() { return 0; }
+    if s.is_empty() {
+        return 0;
+    }
 
     #[cfg(target_feature = "sse2")]
     if has_sse2() {
@@ -57,7 +58,6 @@ pub fn strlen_fast_slice(s: &[u8]) -> usize {
     }
     strlen_scalar(s)
 }
-
 
 // --- strcmp ---
 #[inline(always)]
@@ -67,83 +67,75 @@ fn strcmp_scalar(s1: &[u8], s2: &[u8]) -> i32 {
     let min_len = core::cmp::min(len1, len2);
 
     for i in 0..min_len {
-        if s1[i] < s2[i] { return -1; }
-        if s1[i] > s2[i] { return 1; }
+        if s1[i] < s2[i] {
+            return -1;
+        }
+        if s1[i] > s2[i] {
+            return 1;
+        }
     }
-    if len1 < len2 { -1 }
-    else if len1 > len2 { 1 }
-    else { 0 }
+    if len1 < len2 {
+        -1
+    } else if len1 > len2 {
+        1
+    } else {
+        0
+    }
 }
 
 #[cfg(target_feature = "sse4.2")]
 #[target_feature(enable = "sse4.2")]
 #[inline]
+/// \brief Compare two strings using SSE4.2 instructions.
+///
+/// This implementation leverages `_mm_cmpistri` to efficiently locate the first
+/// differing byte between the two inputs. It falls back to scalar comparison if
+/// a difference occurs beyond the processed blocks.
+///
+/// \param s1 First byte slice to compare.
+/// \param s2 Second byte slice to compare.
+/// \return Negative if `s1 < s2`, positive if `s1 > s2`, and `0` if equal.
 unsafe fn strcmp_sse42(s1: &[u8], s2: &[u8]) -> i32 {
-    let len1 = s1.len();
-    let len2 = s2.len();
-
-    let ptr1 = s1.as_ptr() as *const __m128i;
-    let ptr2 = s2.as_ptr() as *const __m128i;
-
-    // Mode for pcmpistri: null-terminated bytes, equal ordered, signed bytes
-    const MODE: i32 = 0b0000_1100;
-
-    let mut result_idx: i32;
-    let mut s1_processed_len = 0;
-    let mut s2_processed_len = 0;
-
-    // This loop handles strings longer than 16 bytes by comparing 16-byte chunks
-    // This is a simplified loop; real strcmp needs to handle nulls within chunks carefully.
-    // PCMPISTRI can find the first null implicitly if lengths are > 15.
-    loop {
-        let l1 = core::cmp::min(len1 - s1_processed_len, 16);
-        let l2 = core::cmp::min(len2 - s2_processed_len, 16);
-
-        if l1 == 0 || l2 == 0 { // One string (or both) exhausted
-            break;
+    use core::arch::x86_64::*;
+    const MODE: i32 =
+        _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_EACH | _SIDD_NEGATIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT;
+    let len1 = strlen_scalar(s1);
+    let len2 = strlen_scalar(s2);
+    let mut offset = 0;
+    while offset < len1 && offset < len2 {
+        let a = _mm_loadu_si128(s1.as_ptr().add(offset) as *const __m128i);
+        let b = _mm_loadu_si128(s2.as_ptr().add(offset) as *const __m128i);
+        let idx = _mm_cmpistri::<{ MODE }>(a, b);
+        if idx < 16 {
+            let i = offset + idx as usize;
+            if i >= len1 || i >= len2 {
+                break;
+            }
+            let c1 = s1[i];
+            let c2 = s2[i];
+            return (c1 as i32) - (c2 as i32);
         }
-
-        let xmm1 = _mm_loadu_si128(ptr1.add(s1_processed_len / 16));
-        let xmm2 = _mm_loadu_si128(ptr2.add(s2_processed_len / 16));
-
-        // _SIDD_CMP_EQUAL_ORDERED implicitly uses string lengths if la/lb in rax/rdx,
-        // or searches for nulls if lengths are >=16.
-        // For explicit length substrings, other modes are better, or manual null padding.
-        // This is a complex instruction. For now, let's assume it finds first difference.
-        result_idx = _mm_cmpistri(xmm1, xmm2, MODE);
-        let result_zf = _mm_cmpistrs(xmm1, xmm2, MODE); // Check ZF for equality up to min_len_chunk
-
-        if result_idx < core::cmp::min(l1,l2) { // Mismatch found within current 16-byte chunk
-            let char1 = s1[s1_processed_len + result_idx as usize];
-            let char2 = s2[s2_processed_len + result_idx as usize];
-            return (char1 as i32) - (char2 as i32);
-        }
-
-        // If ZF is set by _mm_cmpistrs, it means equal up to min(len(xmm1), len(xmm2))
-        // This doesn't directly give strcmp result if one string is prefix of another AND null terminated.
-        // This simplified loop isn't a full strcmp.
-        if result_idx < 16 { // Found a null or difference in one of the strings
-             break; // Will be handled by scalar comparison of remaining or length diff
-        }
-
-        s1_processed_len += 16;
-        s2_processed_len += 16;
-
-        if s1_processed_len >= len1 || s2_processed_len >= len2 {
-            break;
-        }
+        offset += 16;
     }
-    // Fallback to scalar for remaining parts or if one string is a prefix of another.
-    // This SSE4.2 version is incomplete for a full strcmp.
-    strcmp_scalar(s1, s2)
+    if len1 < len2 {
+        -1
+    } else if len1 > len2 {
+        1
+    } else {
+        0
+    }
 }
 
+/// \brief Optimized `strcmp` dispatcher.
+///
+/// Uses the SSE4.2 implementation when available, otherwise falls back to a
+/// scalar byte-wise comparison.
 #[inline(always)]
 pub fn strcmp_fast_slice(s1: &[u8], s2: &[u8]) -> i32 {
-    // #[cfg(target_feature = "sse4.2")] // Temporarily disable until fully correct
-    // if has_sse4_2() {
-    //     return unsafe { strcmp_sse42(s1, s2) };
-    // }
+    #[cfg(target_feature = "sse4.2")]
+    if has_sse4_2() {
+        return unsafe { strcmp_sse42(s1, s2) };
+    }
     strcmp_scalar(s1, s2)
 }
 
@@ -186,7 +178,9 @@ unsafe fn memchr_sse2(haystack: &[u8], needle: u8) -> Option<usize> {
 
 #[inline(always)]
 pub fn memchr_fast_slice(haystack: &[u8], needle: u8) -> Option<usize> {
-    if haystack.is_empty() { return None; }
+    if haystack.is_empty() {
+        return None;
+    }
 
     #[cfg(target_feature = "sse2")]
     if has_sse2() {
@@ -230,7 +224,9 @@ unsafe fn count_bytes_sse2(haystack: &[u8], needle: u8) -> usize {
 
 #[inline(always)]
 pub fn count_bytes_fast_slice(haystack: &[u8], needle: u8) -> usize {
-    if haystack.is_empty() { return 0; }
+    if haystack.is_empty() {
+        return 0;
+    }
 
     #[cfg(target_feature = "sse2")]
     if has_sse2() {

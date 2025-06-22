@@ -4,47 +4,67 @@ use raw_cpuid::CpuId;
 static HAS_SSE: AtomicBool = AtomicBool::new(false);
 static HAS_SSE2: AtomicBool = AtomicBool::new(false);
 static HAS_MMX: AtomicBool = AtomicBool::new(false);
-// static HAS_3DNOW: AtomicBool = AtomicBool::new(false); // Commented out
+static HAS_3DNOW: AtomicBool = AtomicBool::new(false);
 static HAS_SSE3: AtomicBool = AtomicBool::new(false);
+static HAS_SSSE3: AtomicBool = AtomicBool::new(false);
 static HAS_SSE4_1: AtomicBool = AtomicBool::new(false);
-// static HAS_SSE4A: AtomicBool = AtomicBool::new(false); // Commented out
+static HAS_SSE4A: AtomicBool = AtomicBool::new(false);
 static HAS_CMPXCHG8B: AtomicBool = AtomicBool::new(false);
 static HAS_XSAVE: AtomicBool = AtomicBool::new(false);
 static HAS_FXSR: AtomicBool = AtomicBool::new(false);
 static HAS_SSE4_2: AtomicBool = AtomicBool::new(false);
+static HAS_AVX: AtomicBool = AtomicBool::new(false);
+static HAS_AVX2: AtomicBool = AtomicBool::new(false);
+static HAS_AVX512F: AtomicBool = AtomicBool::new(false);
+static HAS_AVX512VNNI: AtomicBool = AtomicBool::new(false);
+static HAS_AVX_VNNI: AtomicBool = AtomicBool::new(false);
+static HAS_FPU: AtomicBool = AtomicBool::new(false);
 
 pub fn init() {
     let cpuid = CpuId::new();
 
     if let Some(feature_info) = cpuid.get_feature_info() {
+        HAS_FPU.store(feature_info.has_fpu(), Ordering::Relaxed);
         HAS_SSE.store(feature_info.has_sse(), Ordering::Relaxed);
         HAS_SSE2.store(feature_info.has_sse2(), Ordering::Relaxed);
         HAS_MMX.store(feature_info.has_mmx(), Ordering::Relaxed);
         HAS_SSE3.store(feature_info.has_sse3(), Ordering::Relaxed);
+        HAS_SSSE3.store(feature_info.has_ssse3(), Ordering::Relaxed);
         HAS_SSE4_1.store(feature_info.has_sse41(), Ordering::Relaxed); // Changed has_sse4_1 to has_sse41
         HAS_CMPXCHG8B.store(feature_info.has_cmpxchg8b(), Ordering::Relaxed);
         HAS_XSAVE.store(feature_info.has_xsave(), Ordering::Relaxed);
         HAS_FXSR.store(feature_info.has_fxsave_fxstor(), Ordering::Relaxed);
         HAS_SSE4_2.store(feature_info.has_sse42(), Ordering::Relaxed);
+        HAS_AVX.store(feature_info.has_avx(), Ordering::Relaxed);
     } else {
         // This case might occur on very old CPUs or if CPUID is somehow disabled/problematic.
         // For xv6 context, we'd expect feature_info to be available.
         // Consider a panic or a clear log if console is available and this happens.
         // For now, atomics remain false.
         if console_is_ready() {
-             crate::println!("CPUID: Standard Feature Info not available!");
+            crate::println!("CPUID: Standard Feature Info not available!");
         }
     }
 
     if let Some(extended_feature_info) = cpuid.get_extended_feature_info() {
-        // HAS_3DNOW.store(extended_feature_info.has_3dnow(), Ordering::Relaxed); // Commented out
-        // HAS_SSE4A.store(extended_feature_info.has_sse4a(), Ordering::Relaxed); // Commented out
-        let _ = extended_feature_info; // This line ensures extended_feature_info is "used"
+        HAS_AVX2.store(extended_feature_info.has_avx2(), Ordering::Relaxed);
+        HAS_AVX512F.store(extended_feature_info.has_avx512f(), Ordering::Relaxed);
+        HAS_AVX512VNNI.store(extended_feature_info.has_avx512vnni(), Ordering::Relaxed);
+        HAS_AVX_VNNI.store(extended_feature_info.has_avx_vnni(), Ordering::Relaxed);
+        let _ = extended_feature_info; // Ensure value is used
     } else {
         if console_is_ready() {
             // Only print if we were expecting to use these features and they are enabled above
             // crate::println!("CPUID: Extended Feature Info (for 3DNow!/SSE4a) not available.");
         }
+    }
+
+    if let Some(ext_fn_info) = cpuid.get_extended_processor_and_feature_identifiers() {
+        HAS_SSE4A.store(ext_fn_info.has_sse4a(), Ordering::Relaxed);
+        HAS_3DNOW.store(
+            ext_fn_info.has_amd_3dnow_extensions() || ext_fn_info.has_3dnow(),
+            Ordering::Relaxed,
+        );
     }
 
     if console_is_ready() {
@@ -64,9 +84,9 @@ pub fn has_mmx() -> bool {
     HAS_MMX.load(Ordering::Relaxed)
 }
 
-// pub fn has_3dnow() -> bool { // Commented out
-//     HAS_3DNOW.load(Ordering::Relaxed)
-// }
+pub fn has_3dnow() -> bool {
+    HAS_3DNOW.load(Ordering::Relaxed)
+}
 
 pub fn has_sse3() -> bool {
     HAS_SSE3.load(Ordering::Relaxed)
@@ -76,9 +96,9 @@ pub fn has_sse4_1() -> bool {
     HAS_SSE4_1.load(Ordering::Relaxed)
 }
 
-// pub fn has_sse4a() -> bool { // Commented out
-//     HAS_SSE4A.load(Ordering::Relaxed)
-// }
+pub fn has_sse4a() -> bool {
+    HAS_SSE4A.load(Ordering::Relaxed)
+}
 
 pub fn has_cmpxchg8b() -> bool {
     HAS_CMPXCHG8B.load(Ordering::Relaxed)
@@ -96,8 +116,38 @@ pub fn has_sse4_2() -> bool {
     HAS_SSE4_2.load(Ordering::Relaxed)
 }
 
+pub fn has_ssse3() -> bool {
+    HAS_SSSE3.load(Ordering::Relaxed)
+}
+
+pub fn has_avx() -> bool {
+    HAS_AVX.load(Ordering::Relaxed)
+}
+
+pub fn has_avx2() -> bool {
+    HAS_AVX2.load(Ordering::Relaxed)
+}
+
+pub fn has_avx512f() -> bool {
+    HAS_AVX512F.load(Ordering::Relaxed)
+}
+
+pub fn has_avx512vnni() -> bool {
+    HAS_AVX512VNNI.load(Ordering::Relaxed)
+}
+
+pub fn has_avx_vnni() -> bool {
+    HAS_AVX_VNNI.load(Ordering::Relaxed)
+}
+
+pub fn has_fpu() -> bool {
+    HAS_FPU.load(Ordering::Relaxed)
+}
+
 // Placeholder for console readiness
-fn console_is_ready() -> bool { true }
+fn console_is_ready() -> bool {
+    true
+}
 
 fn print_detected_features() {
     crate::println!("CPU Features Detected (Runtime via raw-cpuid):");
@@ -105,11 +155,18 @@ fn print_detected_features() {
     crate::println!("  SSE:  {}", has_sse());
     crate::println!("  SSE2: {}", has_sse2());
     crate::println!("  SSE3: {}", has_sse3());
+    crate::println!("  SSSE3: {}", has_ssse3());
     crate::println!("  SSE4.1: {}", has_sse4_1());
-    // crate::println!("  SSE4a: {}", has_sse4a()); // Commented out
-    // crate::println!("  3DNow!: {}", has_3dnow()); // Commented out
+    crate::println!("  SSE4a: {}", has_sse4a());
+    crate::println!("  3DNow!: {}", has_3dnow());
     crate::println!("  CMPXCHG8B: {}", has_cmpxchg8b());
     crate::println!("  XSAVE: {}", has_xsave());
     crate::println!("  FXSR: {}", has_fxsr());
     crate::println!("  SSE4.2: {}", has_sse4_2());
+    crate::println!("  AVX: {}", has_avx());
+    crate::println!("  AVX2: {}", has_avx2());
+    crate::println!("  AVX512F: {}", has_avx512f());
+    crate::println!("  AVX512VNNI: {}", has_avx512vnni());
+    crate::println!("  AVX_VNNI: {}", has_avx_vnni());
+    crate::println!("  FPU: {}", has_fpu());
 }
