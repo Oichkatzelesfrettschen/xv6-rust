@@ -1,6 +1,6 @@
 #![allow(dead_code)] // Allow unused functions for now
 
-use crate::cpu_features::{has_mmx, has_sse2};
+use crate::cpu_features::{has_avx, has_mmx, has_sse2};
 use core::arch::asm;
 
 // Helper to repeat a byte N times into a u64 for MMX/SSE.
@@ -15,7 +15,6 @@ const fn repeat_byte(byte: u8, times: usize) -> u64 {
     val
 }
 
-
 // --- memcpy ---
 
 #[inline(always)]
@@ -29,7 +28,6 @@ unsafe fn memcpy_mmx(dst: *mut u8, src: *const u8, len: usize) {
     memcpy_scalar(dst, src, len);
     // No EMMS needed as no MMX instructions are used.
 }
-
 
 #[cfg(target_feature = "sse2")]
 #[target_feature(enable = "sse2")]
@@ -61,10 +59,39 @@ unsafe fn memcpy_sse2(dst: *mut u8, src: *const u8, len: usize) {
     }
 }
 
+#[cfg(target_feature = "avx")]
+#[target_feature(enable = "avx")]
+#[inline]
+unsafe fn memcpy_avx(dst: *mut u8, src: *const u8, len: usize) {
+    use core::arch::x86::*;
+    let mut d = dst;
+    let mut s = src;
+    let mut n = len;
+
+    while n >= 32 {
+        let chunk = _mm256_loadu_si256(s as *const __m256i);
+        _mm256_storeu_si256(d as *mut __m256i, chunk);
+        s = s.add(32);
+        d = d.add(32);
+        n -= 32;
+    }
+
+    if n > 0 {
+        memcpy_sse2(d, s, n);
+    }
+}
 
 #[inline(always)]
 pub unsafe fn memcpy_fast(dst: *mut u8, src: *const u8, len: usize) {
-    if len == 0 { return; }
+    if len == 0 {
+        return;
+    }
+
+    #[cfg(target_feature = "avx")]
+    if has_avx() {
+        memcpy_avx(dst, src, len);
+        return;
+    }
 
     #[cfg(target_feature = "sse2")]
     if has_sse2() {
@@ -81,7 +108,6 @@ pub unsafe fn memcpy_fast(dst: *mut u8, src: *const u8, len: usize) {
     memcpy_scalar(dst, src, len);
 }
 
-
 // --- memset ---
 
 #[inline(always)]
@@ -89,14 +115,12 @@ unsafe fn memset_scalar(dst: *mut u8, val: u8, len: usize) {
     core::ptr::write_bytes(dst, val, len);
 }
 
-
 // MMX version is a scalar fallback.
 #[inline]
 unsafe fn memset_mmx(dst: *mut u8, val: u8, len: usize) {
     memset_scalar(dst, val, len);
     // No EMMS needed.
 }
-
 
 #[cfg(target_feature = "sse2")]
 #[target_feature(enable = "sse2")]
@@ -131,10 +155,39 @@ unsafe fn memset_sse2(dst: *mut u8, val: u8, len: usize) {
     }
 }
 
+#[cfg(target_feature = "avx")]
+#[target_feature(enable = "avx")]
+#[inline]
+unsafe fn memset_avx(dst: *mut u8, val: u8, len: usize) {
+    use core::arch::x86::*;
+    let mut d = dst;
+    let mut n = len;
+
+    if n >= 32 {
+        let ymm_val = _mm256_set1_epi8(val as i8);
+        while n >= 32 {
+            _mm256_storeu_si256(d as *mut __m256i, ymm_val);
+            d = d.add(32);
+            n -= 32;
+        }
+    }
+
+    if n > 0 {
+        memset_sse2(d, val, n);
+    }
+}
 
 #[inline(always)]
 pub unsafe fn memset_fast(dst: *mut u8, val: u8, len: usize) {
-    if len == 0 { return; }
+    if len == 0 {
+        return;
+    }
+
+    #[cfg(target_feature = "avx")]
+    if has_avx() {
+        memset_avx(dst, val, len);
+        return;
+    }
 
     #[cfg(target_feature = "sse2")]
     if has_sse2() {
