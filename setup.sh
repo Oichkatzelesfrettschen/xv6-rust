@@ -53,8 +53,32 @@ $SUDO apt-get install -y \
 
 # Fall back to language package managers if the qemu command remains missing.
 if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
-        $SUDO pip3 install --no-binary :all: qemu || true
-        npm install -g qemu || true
+        echo "QEMU not found via OS package manager. Attempting fallback installation..."
+        if command -v pip3 >/dev/null 2>&1; then
+            echo "Attempting QEMU installation via pip3..."
+            $SUDO pip3 install --no-binary :all: qemu || true
+        else
+            echo "pip3 not found, skipping pip3 QEMU installation."
+        fi
+
+        if ! command -v qemu-system-x86_64 >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+            echo "Attempting QEMU installation via npm..."
+            npm install -g qemu || true
+        elif ! command -v npm >/dev/null 2>&1; then
+            echo "npm not found, skipping npm QEMU installation."
+        fi
+
+        if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
+            echo "QEMU still not found in PATH after fallback installation attempts."
+            if [ -f "$HOME/.local/bin/qemu-system-x86_64" ]; then
+                echo "QEMU found in $HOME/.local/bin."
+                echo "Please add $HOME/.local/bin to your PATH environment variable."
+                echo "For example, you can add 'export PATH=\"\$HOME/.local/bin:\$PATH\"' to your .bashrc or .zshrc and restart your shell."
+            else
+                echo "Could not find QEMU in common user-local binary directories."
+                echo "Please install QEMU manually or ensure it's in your PATH."
+            fi
+        fi
 fi
 
 # 4. Install documentation generators & graphviz

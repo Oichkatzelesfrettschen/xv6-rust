@@ -120,7 +120,7 @@ LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing \
-       -O3 -march=native -pipe -ffunction-sections -fdata-sections \
+       -O3 -pipe -ffunction-sections -fdata-sections \
        -Wall -MD -ggdb -m32 -Werror -Wno-array-bounds -fno-omit-frame-pointer
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 CFLAGS += $(CS333_CFLAGS)
