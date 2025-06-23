@@ -26,6 +26,9 @@ Run `./setup.sh` before building to install all dependencies automatically. The 
 Building:
 1. Run `make`. This uses `cargo build` with specific flags (`-Z build-std=...`) to compile the Rust code for the custom target, requiring a nightly toolchain and the `rust-src` component.
 2. Or use Meson with `meson setup build && ninja -C build`. This method uses `cargo xbuild`.
+3. The default configuration sets `CFLAGS` to `-O3 -march=native -pipe` and applies
+   corresponding `RUSTFLAGS` (`-C target-cpu=native -C opt-level=3 -C link-arg=-Wl,--gc-sections`)
+   via `.cargo/config.toml` for optimized, size-trimmed binaries.
 
 (For developers using direct `cargo` commands, e.g., in IDEs, the project includes a `.cargo/config.toml` file that configures the build for the custom target automatically when using a nightly toolchain.)
 
