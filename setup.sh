@@ -46,10 +46,16 @@ $SUDO apt-get install -y \
 
 # 3. Install QEMU & utilities for virtualization/emulation
 $SUDO apt-get install -y \
-	qemu \
-	qemu-system-x86 \
-	qemu-utils \
-	qemu-user-static
+        qemu-system \
+        qemu-system-x86 \
+        qemu-utils \
+        qemu-user-static
+
+# Fall back to language package managers if the qemu command remains missing.
+if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then
+        $SUDO pip3 install --no-binary :all: qemu || true
+        npm install -g qemu || true
+fi
 
 # 4. Install documentation generators & graphviz
 $SUDO apt-get install -y \
@@ -58,11 +64,10 @@ $SUDO apt-get install -y \
 	python3-sphinx \
 	python3-sphinx-rtd-theme \
 	python3-sphinxcontrib.jquery \
-	python3-breathe \
-	qemu-nox
+        python3-breathe
 
-if ! is_installed sphinxcontrib-spelling; then
-	$SUDO apt-get install -y sphinxcontrib-spelling
+if ! python3 -c 'import sphinxcontrib.spelling' 2>/dev/null; then
+        $SUDO pip3 install sphinxcontrib-spelling
 fi
 
 if ! is_installed tmux; then

@@ -119,7 +119,9 @@ AS = $(TOOLPREFIX)gas
 LD = $(TOOLPREFIX)ld
 OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
-CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -Wno-array-bounds -fno-omit-frame-pointer
+CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing \
+       -O3 -march=native -pipe -ffunction-sections -fdata-sections \
+       -Wall -MD -ggdb -m32 -Werror -Wno-array-bounds -fno-omit-frame-pointer
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 CFLAGS += $(CS333_CFLAGS)
 ASFLAGS = -m32 -gdwarf-2 -Wa,-divide
@@ -213,6 +215,10 @@ _forktest: forktest.o $(ULIB)
 	# in order to be able to max out the proc table.
 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o _forktest forktest.o ulib.o usys.o
 	$(OBJDUMP) -S _forktest > forktest.asm
+	
+# Build usertests with size optimizations so it fits within MAXFILE
+_usertests: CFLAGS += -Os
+usertests.o: CFLAGS += -Os
 
 mkfs: mkfs.c fs.h
 	gcc -Werror -Wall $(CS333_CFLAGS) -o mkfs mkfs.c
