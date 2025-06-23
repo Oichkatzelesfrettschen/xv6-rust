@@ -9,9 +9,11 @@ crate-type = ["staticlib"]
 
 [profile.dev]
 panic = "abort"
+opt-level = 3
 
 [profile.release]
 panic = "abort"
+opt-level = 3
 
 [dependencies]
 bitfield = "0.19"
