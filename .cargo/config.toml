@@ -1,9 +1,68 @@
-[unstable]
-build-std = ["core", "alloc", "compiler_builtins"]
-build-std-features = ["compiler-builtins-mem"]
+###############################################################################
+#  Cargo manifest: cpuid-dispatch demo / μ-kernel userspace / bare-metal lib  #
+###############################################################################
 
-[build]
-target = "i386.json"
+[workspace]
+resolver = "2"               # modern feature unification
+members  = [ "." ]           # single-crate workspace for future expansion
 
-[env]
-RUSTFLAGS = "-C opt-level=3 -C link-arg=-Wl,--gc-sections"
+[package]
+name          = "cpuid_dispatch_demo"
+version       = "0.1.0"      # bump via `cargo release`
+authors       = ["Eric (Architectonic Syntheses) <eric@example.com>"]
+edition       = "2024"       # stabilized in Rust 1.85.0 ✨
+license       = "Apache-2.0 OR MIT"
+rust-version  = "1.85"       # first stable with Edition-2024
+
+# ─────────────── Library stanza ───────────────────────────────────────────────
+[lib]
+crate-type = ["rlib", "staticlib"]   # usable from kernel or userland
+
+# ─────────────── Feature topology (atomic + composite) ───────────────────────
+[features]
+# The default build is **fully portable** down to 80386SX: no FPU, no SIMD.
+default           = ["std", "baseline-386"]
+
+# ── platform families ────────────────────────────────────────────────────────
+std               = ["dep:cpufeatures/std", "dep:raw-cpuid/std"] # enable when linking libc
+nostd             = []                                           # build for kernels/bootloaders
+
+# ── atomic CPU tiers (exactly one must be enabled at link-time) ──────────────
+baseline-386      = []                      # 80386 SX/DX
+tier-486          = []                      # 80486 SX/DX (adds CMPXCHG/BSWAP)
+tier-p5           = []                      # Pentium, no MMX
+tier-p5-mmx       = ["simd-mmx"]
+tier-p6-sse       = ["simd-mmx", "simd-sse"]
+tier-p6-sse2      = ["simd-mmx", "simd-sse", "simd-sse2"]
+tier-core-ssse3   = ["simd-mmx", "simd-sse", "simd-sse2", "simd-ssse3"]
+
+# ── orthogonal SIMD feature switches (used by ↑ composites) ──────────────────
+simd-mmx          = []
+simd-sse          = ["simd-mmx"]
+simd-sse2         = ["simd-sse"]
+simd-ssse3        = ["simd-sse2"]
+
+# ─────────────── Dependency graph (all default-features = false) ─────────────
+[dependencies]
+raw-cpuid        = { version = "11.5.0", default-features = false }         # CPUID parser :contentReference[oaicite:0]{index=0}
+cpufeatures      = { version = "0.2.17", default-features = false }         # zero-std runtime detect :contentReference[oaicite:1]{index=1}
+multiversion     = { version = "0.8.0",  default-features = false }         # compile-time cloning :contentReference[oaicite:2]{index=2}
+target-features  = { version = "0.1.2",  optional = true, default-features = false } # feature DB :contentReference[oaicite:3]{index=3}
+
+# `build.rs` can use rustc_version to gate on nightly intrinsics if desired
+[build-dependencies]
+rustc_version    = "0.4"
+
+# ─────────────── Release profiles tuned for micro-RAM hosts ──────────────────
+[profile.release]
+opt-level        = "s"        # smallest code that still vectorizes
+lto              = "fat"      # full-crate LTO (fine; we cross-compile)
+codegen-units    = 1          # maximise inlining for multiversion clones
+strip            = "symbols"
+panic            = "abort"
+
+# A tiny ‘size-optimised but debuggable’ profile for firmware work
+[profile.small]
+inherits         = "release"
+debug            = true
+opt-level        = "z"

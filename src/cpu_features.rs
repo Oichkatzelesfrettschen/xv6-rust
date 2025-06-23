@@ -20,7 +20,51 @@ static HAS_AVX512VNNI: AtomicBool = AtomicBool::new(false);
 static HAS_AVX_VNNI: AtomicBool = AtomicBool::new(false);
 static HAS_FPU: AtomicBool = AtomicBool::new(false);
 
+/// \brief Check if the `CPUID` instruction is available.
+///
+/// The 386 CPU lacked the `CPUID` instruction. Later processors set the
+/// ID flag in EFLAGS to indicate support. This routine toggles the flag
+/// and verifies whether the change persists.
+pub fn cpuid_supported() -> bool {
+    let original: u32;
+    let toggled: u32;
+    unsafe {
+        core::arch::asm!(
+            "pushfd",
+            "pop {0}",
+            out(reg) original,
+            options(nostack, preserves_flags),
+        );
+        let with_id = original ^ (1 << 21);
+        core::arch::asm!(
+            "push {0} \n popfd",
+            in(reg) with_id,
+            options(nostack, preserves_flags),
+        );
+        core::arch::asm!(
+            "pushfd",
+            "pop {0}",
+            out(reg) toggled,
+            options(nostack, preserves_flags),
+        );
+    }
+    ((original ^ toggled) & (1 << 21)) != 0
+}
+
+/// \brief Initialize CPU feature detection.
+///
+/// The function populates a set of global feature flags using the
+/// [`raw_cpuid`] crate. When the `CPUID` instruction is not supported,
+/// no flags are set and the routine returns early so the kernel can
+/// operate on a minimal 386 feature set.
 pub fn init() {
+    if !cpuid_supported() {
+        if console_is_ready() {
+            crate::println!("CPUID not supported; assuming 386-class CPU");
+        }
+        return;
+    }
+
     let cpuid = CpuId::new();
 
     if let Some(feature_info) = cpuid.get_feature_info() {
@@ -142,6 +186,31 @@ pub fn has_avx_vnni() -> bool {
 
 pub fn has_fpu() -> bool {
     HAS_FPU.load(Ordering::Relaxed)
+}
+
+/// CPU type classification used for 386 variants.
+pub enum CpuVariant {
+    /// 386SX without FPU.
+    I386SX,
+    /// 386DX with external 387 FPU present.
+    I386DX,
+    /// Any processor with CPUID support or otherwise not a 386-class CPU.
+    Other,
+}
+
+/// \brief Determine whether the processor is a 386SX or 386DX.
+///
+/// Call [`init`] prior to invoking this function so that [`has_fpu`] reflects
+/// the presence of a math coprocessor. When `CPUID` is available the processor
+/// is considered newer than a 386 and [`CpuVariant::Other`] is returned.
+pub fn detect_386_variant() -> CpuVariant {
+    if cpuid_supported() {
+        CpuVariant::Other
+    } else if has_fpu() {
+        CpuVariant::I386DX
+    } else {
+        CpuVariant::I386SX
+    }
 }
 
 // Placeholder for console readiness
