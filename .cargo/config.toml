@@ -1,68 +1,119 @@
 ###############################################################################
-#  Cargo manifest: cpuid-dispatch demo / μ-kernel userspace / bare-metal lib  #
+#  Cargo manifest: xv6-rust micro-kernel / CPUID-dispatch demo                #
 ###############################################################################
 
 [workspace]
-resolver = "2"               # modern feature unification
-members  = [ "." ]           # single-crate workspace for future expansion
+resolver   = "2"            # modern feature unification
+members    = [ "." ]        # single-crate workspace; sub-crates can be added
 
+###############################################################################
+#  Kernel crate metadata                                                      #
+###############################################################################
 [package]
-name          = "cpuid_dispatch_demo"
-version       = "0.1.0"      # bump via `cargo release`
-authors       = ["Eric (Architectonic Syntheses) <eric@example.com>"]
-edition       = "2024"       # stabilized in Rust 1.85.0 ✨
+name          = "xv6_rust_kernel"
+version       = "0.1.0"           # bump with `cargo release`
+edition       = "2024"            # stabilized in Rust 1.85.0  📈
+authors       = ["Eric <eric@example.com>"]
 license       = "Apache-2.0 OR MIT"
-rust-version  = "1.85"       # first stable with Edition-2024
+rust-version  = "1.85"            # first stable with Edition-2024
 
-# ─────────────── Library stanza ───────────────────────────────────────────────
+###############################################################################
+#  Library output options                                                     #
+###############################################################################
 [lib]
-crate-type = ["rlib", "staticlib"]   # usable from kernel or userland
+crate-type = ["rlib", "staticlib"] # usable by bootloader or userland
 
-# ─────────────── Feature topology (atomic + composite) ───────────────────────
+###############################################################################
+#  Feature topology: atomic tiers + orthogonal SIMD flags                     #
+###############################################################################
 [features]
-# The default build is **fully portable** down to 80386SX: no FPU, no SIMD.
+# default build: fully portable baseline-386 plus std when linking to libc
 default           = ["std", "baseline-386"]
 
-# ── platform families ────────────────────────────────────────────────────────
-std               = ["dep:cpufeatures/std", "dep:raw-cpuid/std"] # enable when linking libc
-nostd             = []                                           # build for kernels/bootloaders
+# — platform families —
+std               = ["dep:cpufeatures/std", "dep:raw-cpuid/std"]
+nostd             = []                         # keep core-only for kernels
 
-# ── atomic CPU tiers (exactly one must be enabled at link-time) ──────────────
-baseline-386      = []                      # 80386 SX/DX
-tier-486          = []                      # 80486 SX/DX (adds CMPXCHG/BSWAP)
-tier-p5           = []                      # Pentium, no MMX
+# — atomic CPU tiers (exactly one activated by Cargo at *link* time) —
+baseline-386      = []                                   # 80386 SX/DX
+tier-486          = []                                   # 80486 (BSWAP/CMPXCHG)
+tier-p5           = []                                   # Pentium, no MMX
 tier-p5-mmx       = ["simd-mmx"]
 tier-p6-sse       = ["simd-mmx", "simd-sse"]
 tier-p6-sse2      = ["simd-mmx", "simd-sse", "simd-sse2"]
 tier-core-ssse3   = ["simd-mmx", "simd-sse", "simd-sse2", "simd-ssse3"]
 
-# ── orthogonal SIMD feature switches (used by ↑ composites) ──────────────────
+# — orthogonal SIMD feature switches (used by ↑ composites) —
 simd-mmx          = []
 simd-sse          = ["simd-mmx"]
 simd-sse2         = ["simd-sse"]
 simd-ssse3        = ["simd-sse2"]
 
-# ─────────────── Dependency graph (all default-features = false) ─────────────
+###############################################################################
+#  Dependencies (all `default-features = false` to stay no-std)               #
+###############################################################################
 [dependencies]
-raw-cpuid        = { version = "11.5.0", default-features = false }         # CPUID parser :contentReference[oaicite:0]{index=0}
-cpufeatures      = { version = "0.2.17", default-features = false }         # zero-std runtime detect :contentReference[oaicite:1]{index=1}
-multiversion     = { version = "0.8.0",  default-features = false }         # compile-time cloning :contentReference[oaicite:2]{index=2}
-target-features  = { version = "0.1.2",  optional = true, default-features = false } # feature DB :contentReference[oaicite:3]{index=3}
+raw-cpuid     = { version = "11.5.0", default-features = false } # CPUID parse
+cpufeatures   = { version = "0.2.17", default-features = false } # runtime detect
+multiversion  = { version = "0.8.0",  default-features = false } # fn multiversion
+target-features = { version = "0.1.2", optional = true, default-features = false }
 
-# `build.rs` can use rustc_version to gate on nightly intrinsics if desired
+# typical kernel helpers (all no-std)
+spin          = { version = "0.9",     default-features = false, optional = true }
+volatile      = { version = "0.5",     default-features = false, optional = true }
+x86           = { version = "0.52",    default-features = false, optional = true }
+
+###############################################################################
+#  Build-time helpers                                                         #
+###############################################################################
 [build-dependencies]
-rustc_version    = "0.4"
+rustc_version = "0.4"   # allow build.rs to gate on nightly intrinsics
 
-# ─────────────── Release profiles tuned for micro-RAM hosts ──────────────────
+###############################################################################
+#  Environment defaults (can be overridden via `cargo config` or env)         #
+###############################################################################
+[env]
+# Optimise hard, strip dead sections; target-specific cpu/fpu flags are added
+# by `.cargo/config.toml` per-target blocks.
+RUSTFLAGS = "-C opt-level=3 -C link-arg=-Wl,--gc-sections"
+
+###############################################################################
+#  Release profiles tuned for micro-RAM targets                               #
+###############################################################################
 [profile.release]
-opt-level        = "s"        # smallest code that still vectorizes
-lto              = "fat"      # full-crate LTO (fine; we cross-compile)
-codegen-units    = 1          # maximise inlining for multiversion clones
+opt-level        = "s"        # tiny yet still vectorises
+lto              = "fat"
+codegen-units    = 1          # maximise inlining across multiversion clones
 strip            = "symbols"
 panic            = "abort"
 
-# A tiny ‘size-optimised but debuggable’ profile for firmware work
+# ‘Small’ == size-optimised *but* debuggable (good for firmware dev)
 [profile.small]
 inherits         = "release"
 debug            = true
 opt-level        = "z"
+
+[build]
+target = "x86_64-unknown-none"      # default hostless kernel target
+
+[target.x86_64-unknown-none]
+rustflags = [
+  "-C", "target-cpu=x86-64",        # LLVM “x86-64 v1” baseline
+  "-C", "target-feature=+fxsr,+mmx,+sse,+sse2",
+]
+
+[target.i686-unknown-none]
+rustflags = ["-C", "target-cpu=pentium4", "-C", "target-feature=+sse2"]
+
+[target.i586-unknown-none"]
+rustflags = ["-C", "target-cpu=pentium",  "-C", "target-feature=+mmx"]
+
+[target.i486-unknown-none"]
+rustflags = ["-C", "target-cpu=i486"]
+
+[target.i386-unknown-none"]
+rustflags = ["-C", "target-cpu=i386"]
+
+# Vortex86DX3 has FPU + MMX but no SSE
+[target.vortex86dx3-unknown-none-json]
+rustflags = ["-C", "target-cpu=pentium", "-C", "target-feature=+mmx"]
